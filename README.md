@@ -18,6 +18,18 @@
 **호모그래피 하나**로 끝난다. 전체 설계와 광학 리스크는
 `~/.claude/plans/imx291-usb-usb-shimmying-honey.md` 참조.
 
+## 배선
+
+| 연결 | ESP32-S3 | 비고 |
+|---|---|---|
+| VL53L8CX `SDA` | `GPIO4` | I2C 400 kHz |
+| VL53L8CX `SCL` | `GPIO5` | |
+| VL53L8CX `VDD` / `GND` | 3V3 / GND | LPn · I2C_RST 미사용 |
+| 동기용 LED (+저항) | `GPIO2` | 카메라 지연 실측용. **카메라 시야 안**에 놓을 것 |
+
+보드 내장 RGB LED(`GPIO48`)는 addressable 이라 `digitalWrite` 로 못 쓴다.
+핀은 `firmware/src/main.cpp` 상단의 `SDA_PIN` / `SCL_PIN` / `LED_PIN` 에서 바꾼다.
+
 ## 빠른 시작
 
 ```bash

@@ -40,8 +40,8 @@
 #include <esp_timer.h>
 #include <vl53l8cx.h>
 
-#define SDA_PIN 8
-#define SCL_PIN 9
+#define SDA_PIN 4
+#define SCL_PIN 5
 
 /* 카메라 지연 실측용 LED. 카메라 시야 안에 들어오게 외부 LED + 저항을 단다.
  * 보드 내장 RGB LED(GPIO48)는 addressable 이라 단순 digitalWrite 가 안 된다. */

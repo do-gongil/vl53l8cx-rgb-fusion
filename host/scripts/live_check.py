@@ -75,6 +75,11 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--disp-height", type=int, default=540, help="표시 높이 (저장은 원본)")
     ap.add_argument("--max", dest="vmax", type=float, default=1500.0, help="컬러맵 상한 mm")
     ap.add_argument("--out", type=Path, default=Path("snapshots"), help="스냅샷 저장 폴더")
+    ap.add_argument(
+        "--no-flip",
+        action="store_true",
+        help="좌우 반전을 끈다 (기본: 켬 — 센서 장착 방향 보정)",
+    )
     ap.add_argument("--no-camera", action="store_true", help="카메라를 열지 않는다")
     ap.add_argument("--no-tof", action="store_true", help="ToF 를 열지 않는다")
     return ap.parse_args()
@@ -147,6 +152,7 @@ def build_hud(
     tof: ToFFrame | None,
     vmax: float,
     dropped: int,
+    flip_lr: bool,
 ) -> list[str]:
     lines = [f"CAM  {info.describe() if info else '없음'}  {cam_fps.value:4.1f} fps"]
     if tof is None:
@@ -162,7 +168,10 @@ def build_hud(
         ]
         if tof.t_us is not None:
             lines.append(f"     t={tof.t_us / 1e6:10.3f}s  seq={tof.seq}")
-    lines.append(f"범위 0~{vmax:.0f}mm   [ ] 범위  N 무효  T 숫자  S 저장  Q 종료")
+    lines.append(
+        f"범위 0~{vmax:.0f}mm   좌우반전 {'ON' if flip_lr else 'OFF'}   "
+        f"[ ] 범위  N 무효  T 숫자  F 반전  S 저장  Q 종료"
+    )
     return lines
 
 
@@ -179,6 +188,7 @@ def main() -> int:
     last_frame: np.ndarray | None = None
     vmax = args.vmax
     show_invalid, show_text = True, True
+    flip_lr = not args.no_flip
     dropped_total = 0
 
     cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
@@ -193,7 +203,7 @@ def main() -> int:
                     cam_fps.tick()
 
             if ser is not None:
-                drained = tof_reader.drain_latest(ser)
+                drained = tof_reader.drain_latest(ser, flip_lr=flip_lr)
                 for status in drained.statuses:
                     print(status.text)
                 if drained.frame is not None:
@@ -218,7 +228,10 @@ def main() -> int:
             canvas = render.side_by_side(left, heat)
             canvas = render.hud(
                 canvas,
-                build_hud(info, port, args.baud, cam_fps, tof_fps, tof, vmax, dropped_total),
+                build_hud(
+                    info, port, args.baud, cam_fps, tof_fps, tof, vmax,
+                    dropped_total, flip_lr,
+                ),
             )
             cv2.imshow(WINDOW, canvas)
 
@@ -235,6 +248,11 @@ def main() -> int:
                 show_invalid = not show_invalid
             elif key == ord("t"):
                 show_text = not show_text
+            elif key == ord("f"):
+                flip_lr = not flip_lr
+                if tof is not None:
+                    # 다음 프레임을 기다리지 않고 바로 뒤집힌 화면을 보여준다.
+                    tof = tof.fliplr()
 
             if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
                 break
