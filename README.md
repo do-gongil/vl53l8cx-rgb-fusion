@@ -54,12 +54,46 @@ cd ../firmware && pio run -t upload
 | `N` | 무효 zone 표시 |
 | `T` | zone 숫자 |
 
+## Xtalk 캘리브레이션 (빔스플리터 장착 후 필수)
+
+BS 표면에서 940 nm VCSEL 광이 곧바로 SPAD 로 되돌아오면 **거리 ~0 의 강한 가짜 타깃**이
+생긴다. ST 는 커버글라스 crosstalk 내성을 **60 cm 이상**에서만 보장하는데 이 장비의
+작동거리는 **5~30 cm** 다. 보정 없이는 시료 반사광과 고스트의 히스토그램이 겹쳐
+측정이 통째로 망가질 수 있다.
+
+```bash
+cd host
+python scripts/calib_xtalk.py              # 기본값 3% / 16샘플 / 600mm
+python scripts/calib_xtalk.py --distance 800
+python scripts/calib_xtalk.py --clear      # 저장본 삭제
+```
+
+| 인자 | 범위 | 비고 |
+|---|---|---|
+| `--reflectance` | 1~99 | ST 권장 **3** (밝은 타깃은 포화돼 오히려 나쁘다) |
+| `--samples` | 1~16 | 많을수록 정확, 그만큼 오래 걸림 |
+| `--distance` | 600~3000 mm | ULD 제약. 작동거리보다 멀지만 결과는 전 구간에 적용 |
+
+**타깃이 시야를 꽉 채워야 한다.** 600 mm 에서 약 **54 x 54 cm** 가 필요하다
+(ToF 시야 48.5° 정사각). 모자라면 에러가 아니라 *그럴듯한 틀린 값*이 나오므로
+스크립트가 실행 전에 점검표를 띄운다.
+
+보정값(776 byte)은 **ESP32 의 NVS 에 저장**되어 부팅 때마다 자동 적용된다.
+적용 여부는 부팅 로그의 `xtalk=on` 또는 `# xtalk: 저장된 보정값 적용` 로 확인한다.
+광학계를 바꾸면 다시 실행해야 한다.
+
+> `--clear` 는 NVS 저장본만 지운다. 센서 RAM 에 이미 올라간 보정을 되돌리는 API 가
+> 없으므로 **재부팅해야 완전히 빠진다.**
+
 ## 시리얼 프로토콜 v2
 
 ```
 F,<t_us>,<seq>,<d0..d63>,<s0..s63>   프레임 (인덱스 = y*8+x, mm, status 원본)
 P,<t_us>                             '?' 에 대한 ping 응답
 K,<t_us>                             'L' LED 점등 시각 (카메라 지연 실측용)
+XT,ok,<반사율>,<샘플수>,<거리mm>  xtalk 캘리브레이션 성공 ('X' 응답)
+XT,err,<코드>,<사유>              실패 (코드는 ULD status)
+XT,cleared / XT,none             저장본 삭제 / 저장본 없음 ('C' 응답)
 #...                                 상태 메시지
 ```
 
@@ -91,6 +125,7 @@ host/src/toffuse/
   console.py    Windows 한글 출력 보정
 host/scripts/
   live_check.py 두 장치 동시 표시 (Phase 0)
+  calib_xtalk.py  빔스플리터 crosstalk 보정 (Phase 0.5)
 ```
 
 ## 관련 저장소

@@ -14,6 +14,7 @@ from toffuse.protocol import (
     Pong,
     Status,
     ToFFrame,
+    XtalkResult,
     parse_line,
 )
 
@@ -229,3 +230,62 @@ def test_v1_line_with_noninteger_field_returns_none() -> None:
     """v1 경로에서도 정수가 아닌 필드는 조용히 버린다."""
     assert parse_line("F," + ",".join(["1"] * 63 + ["oops"])) is None
 
+
+
+# --- Xtalk 캘리브레이션 응답 -----------------------------------------------
+
+def test_xtalk_ok_parsed() -> None:
+    r = parse_line("XT,ok,3,16,600")
+    assert isinstance(r, XtalkResult)
+    assert r.ok is True
+    assert r.reflectance_percent == 3
+    assert r.nb_samples == 16
+    assert r.distance_mm == 600
+    assert r.code == 0
+
+
+def test_xtalk_err_keeps_code_and_korean_reason() -> None:
+    """실패 사유는 사람이 읽고 물리 세팅을 고치는 근거다. 잘리면 안 된다."""
+    r = parse_line("XT,err,255,캘리브레이션 실패 (타깃이 시야를 채우는지 확인)")
+    assert isinstance(r, XtalkResult)
+    assert r.ok is False
+    assert r.code == 255
+    assert "타깃이 시야를" in r.message
+
+
+def test_xtalk_err_reason_may_contain_commas() -> None:
+    """사유에 쉼표가 들어가도 통째로 남아야 한다."""
+    r = parse_line("XT,err,127,반사율 0 은 1~99 범위 밖, 3 을 권장")
+    assert isinstance(r, XtalkResult)
+    assert r.message == "반사율 0 은 1~99 범위 밖, 3 을 권장"
+
+
+@pytest.mark.parametrize("line,ok", [("XT,cleared", True), ("XT,none", True)])
+def test_xtalk_clear_responses(line: str, ok: bool) -> None:
+    r = parse_line(line)
+    assert isinstance(r, XtalkResult)
+    assert r.ok is ok
+    assert r.reflectance_percent is None
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "XT",              # 접두사만
+        "XT,",             # 종류 없음
+        "XT,ok",           # 인자 부족
+        "XT,ok,3,16",      # 인자 부족
+        "XT,ok,a,16,600",  # 정수가 아님
+        "XT,err",          # 코드 없음
+        "XT,err,abc,사유",  # 코드가 정수가 아님
+        "XT,bogus",        # 알 수 없는 종류
+    ],
+)
+def test_xtalk_garbage_returns_none(line: str) -> None:
+    assert parse_line(line) is None
+
+
+def test_xtalk_line_is_not_confused_with_frame() -> None:
+    """'XT,' 와 'F,' 가 서로를 먹지 않아야 한다."""
+    assert isinstance(parse_line("XT,cleared"), XtalkResult)
+    assert isinstance(parse_line(v1_line(ramp())), ToFFrame)

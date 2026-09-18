@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from toffuse.protocol import GRID, Pong, Status, ToFFrame
+from toffuse.protocol import GRID, Pong, Status, ToFFrame, XtalkResult
 from toffuse.tof_reader import drain_latest
 
 
@@ -138,3 +138,32 @@ def test_mixed_v1_and_v2_frames() -> None:
 def test_dropped_count_matches_backlog(count: int) -> None:
     d = drain_latest(FakeSerial([frame_line(i) for i in range(count)]))
     assert d.dropped == count - 1
+
+
+# --- Xtalk 응답 ------------------------------------------------------------
+
+def test_xtalk_result_is_not_swallowed() -> None:
+    """XT 응답을 흘려버리면 캘리브레이션 성공 여부를 알 길이 없다."""
+    d = drain_latest(FakeSerial([frame_line(100), "XT,ok,3,16,600"]))
+    assert isinstance(d.xtalk, XtalkResult)
+    assert d.xtalk.ok and d.xtalk.distance_mm == 600
+    assert isinstance(d.frame, ToFFrame)      # 프레임도 그대로 살아 있다
+
+
+def test_xtalk_error_survives_alongside_status_lines() -> None:
+    d = drain_latest(
+        FakeSerial(["# xtalk 시작", "XT,err,255,타깃이 시야를 못 채움", "# 끝"])
+    )
+    assert isinstance(d.xtalk, XtalkResult)
+    assert d.xtalk.ok is False and d.xtalk.code == 255
+    assert len(d.statuses) == 2
+
+
+def test_latest_xtalk_wins() -> None:
+    d = drain_latest(FakeSerial(["XT,none", "XT,cleared"]))
+    assert isinstance(d.xtalk, XtalkResult)
+    assert d.xtalk.message == "cleared"
+
+
+def test_no_xtalk_means_none() -> None:
+    assert drain_latest(FakeSerial([frame_line(100)])).xtalk is None

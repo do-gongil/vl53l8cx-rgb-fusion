@@ -24,6 +24,14 @@
  *     'L' -> K,<t_us>  : LED 를 켠 시각을 알려준다. 호스트는 그 LED 가
  *                        영상에 나타난 프레임을 찾아 카메라 지연을 실측한다.
  *
+ *  5) Xtalk(광학 crosstalk) 캘리브레이션
+ *     빔스플리터 표면에서 VCSEL 광이 곧바로 SPAD 로 되돌아오면 거리 ~0 의
+ *     강한 가짜 타깃이 생긴다. 5~30 cm 매크로 거리에서는 시료 반사광과
+ *     히스토그램이 겹쳐 측정이 통째로 망가질 수 있다. 보정값은 NVS 에
+ *     저장해 부팅 때마다 자동으로 다시 적용한다.
+ *     'X[<반사율>,<샘플수>,<거리mm>]' -> 캘리브레이션 후 저장
+ *     'C'                             -> 저장본 삭제
+ *
  * 출력 (프레임당 한 줄):
  *   F,<t_us>,<seq>,<d0..d63>,<s0..s63>
  *   인덱스 = y*8 + x, 거리 단위 mm (원본), status 는 ST ULD 원본값
@@ -33,9 +41,13 @@
  * 그 밖의 줄:
  *   P,<t_us>   ping 응답
  *   K,<t_us>   LED 점등 시각
+ *   XT,ok,<반사율>,<샘플수>,<거리mm>   xtalk 캘리브레이션 성공
+ *   XT,err,<코드>,<사유>               실패 (코드는 ULD status)
+ *   XT,cleared / XT,none               저장본 삭제 / 저장본 없음
  *   #...       상태 메시지
  */
 #include <Arduino.h>
+#include <Preferences.h>
 #include <Wire.h>
 #include <esp_timer.h>
 #include <vl53l8cx.h>
@@ -51,13 +63,120 @@
 #define SERIAL_BAUD 921600
 #define ZONES 64
 
+/* Xtalk 보정값 저장 위치 (NVS). 776 byte 라 blob 하나로 충분하다. */
+#define XTALK_NS  "tof"
+#define XTALK_KEY "xtalk"
+
+/* 기본 캘리브레이션 조건.
+ * ST 는 3% 반사율 타깃을 권장한다 (밝은 타깃은 포화돼 오히려 나쁘다).
+ * 거리는 ULD 가 600~3000 mm 만 받는다 -- 우리 작동거리(50~300 mm)보다
+ * 멀지만 이건 '보정을 측정하는 거리'일 뿐이고, 결과는 전 구간에 적용된다.
+ * 타깃이 시야를 꽉 채워야 하므로 600 mm 에서 약 54 x 54 cm 가 필요하다. */
+#define XTALK_DEF_REFLECTANCE 3
+#define XTALK_DEF_SAMPLES     16
+#define XTALK_DEF_DISTANCE_MM 600
+#define XTALK_MIN_DISTANCE_MM 600
+#define XTALK_MAX_DISTANCE_MM 3000
+
 VL53L8CX sensor(&Wire, -1, -1);  // LPn, I2C_RST 미사용
 
 static uint32_t g_seq = 0;
 static int64_t g_led_off_us = 0;  // 0 이면 꺼져 있음
 
+static Preferences g_nvs;
+static uint8_t g_xtalk[VL53L8CX_XTALK_BUFFER_SIZE];
+static bool g_xtalk_loaded = false;
+
 /* 타깃 2개까지도 다 담을 크기. 타깃당 최대 약 770 byte. */
 static char g_line[2048];
+
+/* NVS 에 저장된 Xtalk 보정값을 센서에 다시 밀어넣는다.
+ * init() 뒤, start_ranging() 앞에서 불러야 한다. */
+static bool loadXtalk() {
+  if (!g_nvs.begin(XTALK_NS, /*readOnly=*/true)) return false;
+  const size_t n = g_nvs.getBytesLength(XTALK_KEY);
+  bool ok = false;
+  if (n == sizeof(g_xtalk)) {
+    g_nvs.getBytes(XTALK_KEY, g_xtalk, sizeof(g_xtalk));
+    ok = (sensor.set_caldata_xtalk(g_xtalk) == 0);
+  }
+  g_nvs.end();
+  return ok;
+}
+
+static void clearXtalk() {
+  if (!g_nvs.begin(XTALK_NS, /*readOnly=*/false)) {
+    Serial.println("XT,err,255,NVS 열기 실패");
+    return;
+  }
+  const bool had = g_nvs.isKey(XTALK_KEY);
+  if (had) g_nvs.remove(XTALK_KEY);
+  g_nvs.end();
+  Serial.println(had ? "XT,cleared" : "XT,none");
+  /* RAM 에 이미 적용된 보정은 그대로 남는다. 센서를 되돌리는 API 가 없어
+   * 재부팅이 유일하게 확실한 방법이다. 조용히 넘어가면 안 되는 부분. */
+  if (had) Serial.println("# 저장본만 지웠다. 재부팅해야 센서에서도 빠진다.");
+}
+
+/* Xtalk 캘리브레이션. 수십 초 동안 프레임이 멎으므로 호스트가 끊긴 것으로
+ * 오해하지 않도록 시작·끝을 상태 메시지로 알린다. */
+static void runXtalk(uint16_t reflectance, uint8_t samples, uint16_t distance) {
+  /* ULD 는 인자가 틀리면 127 만 주고 무엇이 틀렸는지는 안 알려준다.
+   * 물리 세팅을 다시 잡는 비용이 크므로 여기서 먼저 걸러낸다. */
+  if (reflectance < 1 || reflectance > 99) {
+    Serial.printf("XT,err,127,반사율 %u 는 1~99 범위 밖\n", reflectance);
+    return;
+  }
+  if (samples < 1 || samples > 16) {
+    Serial.printf("XT,err,127,샘플수 %u 는 1~16 범위 밖\n", samples);
+    return;
+  }
+  if (distance < XTALK_MIN_DISTANCE_MM || distance > XTALK_MAX_DISTANCE_MM) {
+    Serial.printf("XT,err,127,거리 %u mm 는 %u~%u 범위 밖\n",
+                  distance, XTALK_MIN_DISTANCE_MM, XTALK_MAX_DISTANCE_MM);
+    return;
+  }
+
+  Serial.printf("# xtalk 시작: 반사율 %u%%, 샘플 %u, 거리 %u mm\n",
+                reflectance, samples, distance);
+  Serial.println("# 수십 초 걸린다. 그동안 프레임이 나오지 않는다.");
+
+  sensor.stop_ranging();
+  const uint8_t st = sensor.calibrate_xtalk(reflectance, samples, distance);
+
+  if (st != 0) {
+    Serial.printf("XT,err,%u,캘리브레이션 실패 (타깃이 시야를 채우는지 확인)\n", st);
+  } else if (sensor.get_caldata_xtalk(g_xtalk) != 0) {
+    Serial.println("XT,err,255,보정값 읽기 실패");
+  } else if (!g_nvs.begin(XTALK_NS, /*readOnly=*/false)) {
+    Serial.println("XT,err,255,NVS 열기 실패");
+  } else {
+    const size_t written = g_nvs.putBytes(XTALK_KEY, g_xtalk, sizeof(g_xtalk));
+    g_nvs.end();
+    if (written != sizeof(g_xtalk)) {
+      Serial.printf("XT,err,255,NVS 저장 %u/%u byte\n",
+                    (unsigned)written, (unsigned)sizeof(g_xtalk));
+    } else {
+      g_xtalk_loaded = true;
+      Serial.printf("XT,ok,%u,%u,%u\n", reflectance, samples, distance);
+    }
+  }
+
+  /* 성공하든 실패하든 측정은 반드시 되살린다. */
+  sensor.start_ranging();
+}
+
+/* 'X' 뒤에 붙은 인자를 읽는다. 비어 있으면 기본값. */
+static void handleXtalkCommand() {
+  String args = Serial.readStringUntil('\n');
+  args.trim();
+  unsigned r = XTALK_DEF_REFLECTANCE, n = XTALK_DEF_SAMPLES, d = XTALK_DEF_DISTANCE_MM;
+  if (args.length() > 0 && sscanf(args.c_str(), "%u,%u,%u", &r, &n, &d) != 3) {
+    Serial.println("XT,err,127,인자 형식은 X<반사율>,<샘플수>,<거리mm>");
+    return;
+  }
+  runXtalk((uint16_t)r, (uint8_t)n, (uint16_t)d);
+}
 
 /* '?' 와 'L' 은 ranging 읽기보다 먼저 처리한다. ping 응답이 프레임 전송
  * 뒤로 밀리면 왕복 시간에 그만큼 오차가 섞여 클럭 추정이 망가진다. */
@@ -71,6 +190,10 @@ static void handleCommands() {
       digitalWrite(LED_PIN, HIGH);
       g_led_off_us = now + LED_PULSE_US;
       Serial.printf("K,%lld\n", (long long)now);
+    } else if (c == 'X') {
+      handleXtalkCommand();
+    } else if (c == 'C') {
+      clearXtalk();
     }
   }
 }
@@ -110,6 +233,7 @@ static void emitFrame(const VL53L8CX_ResultsData &r, int64_t t_us) {
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
+  Serial.setTimeout(50);  // handleXtalkCommand 의 인자 읽기 상한
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
   delay(1000);
@@ -128,10 +252,17 @@ void setup() {
 
   sensor.set_resolution(VL53L8CX_RESOLUTION_8X8);
   sensor.set_ranging_frequency_hz(15);  // 8x8 최대치
+
+  /* 저장된 Xtalk 보정값이 있으면 되살린다. start_ranging() 앞이어야 한다. */
+  g_xtalk_loaded = loadXtalk();
+  Serial.println(g_xtalk_loaded ? "# xtalk: 저장된 보정값 적용"
+                                : "# xtalk: 보정값 없음 (X 명령으로 캘리브레이션)");
+
   sensor.start_ranging();
 
-  Serial.printf("# proto=2 res=8x8 rate=15 ntarget=%d baud=%d\n",
-                VL53L8CX_NB_TARGET_PER_ZONE, SERIAL_BAUD);
+  Serial.printf("# proto=2 res=8x8 rate=15 ntarget=%d baud=%d xtalk=%s\n",
+                VL53L8CX_NB_TARGET_PER_ZONE, SERIAL_BAUD,
+                g_xtalk_loaded ? "on" : "off");
 }
 
 void loop() {

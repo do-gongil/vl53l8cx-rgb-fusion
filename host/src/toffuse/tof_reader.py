@@ -15,7 +15,7 @@ from typing import Protocol
 import serial
 from serial.tools import list_ports
 
-from .protocol import Pong, Status, ToFFrame, parse_line
+from .protocol import Pong, Status, ToFFrame, XtalkResult, parse_line
 
 DEFAULT_BAUD = 115200          # 구 펌웨어. v2 펌웨어는 921600.
 _READ_TIMEOUT_S = 0.05         # 잘린 줄에 걸려도 루프가 멎지 않을 만큼 짧게
@@ -41,6 +41,7 @@ class Drained:
 
     frame: ToFFrame | None          # 마지막 유효 프레임
     pong: Pong | None               # 마지막 pong
+    xtalk: XtalkResult | None       # 마지막 xtalk 캘리브레이션 응답
     statuses: tuple[Status, ...]    # 순서대로 모인 '#' 줄
     dropped: int                    # 최신 것에 밀려 버려진 프레임 수
 
@@ -76,6 +77,7 @@ def drain_latest(ser: SerialLike) -> Drained:
     """
     frame: ToFFrame | None = None
     pong: Pong | None = None
+    xtalk: XtalkResult | None = None
     statuses: list[Status] = []
     dropped = 0
 
@@ -90,7 +92,11 @@ def drain_latest(ser: SerialLike) -> Drained:
             frame = item
         elif isinstance(item, Pong):
             pong = item
+        elif isinstance(item, XtalkResult):
+            xtalk = item
         elif isinstance(item, Status):
             statuses.append(item)
 
-    return Drained(frame=frame, pong=pong, statuses=tuple(statuses), dropped=dropped)
+    return Drained(
+        frame=frame, pong=pong, xtalk=xtalk, statuses=tuple(statuses), dropped=dropped
+    )

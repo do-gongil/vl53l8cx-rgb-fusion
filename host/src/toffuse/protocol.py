@@ -118,6 +118,24 @@ class Pong:
 
 
 @dataclass(frozen=True)
+class XtalkResult:
+    """Xtalk 캘리브레이션 명령('X' / 'C')에 대한 응답.
+
+    빔스플리터 고스트 보정은 물리 세팅이 조금만 틀려도 조용히 쓸모없는 값을
+    내놓는다. 그래서 성공/실패를 사람 눈이 아니라 프로그램이 판정할 수 있게
+    구조화해 받는다. ``message`` 는 세팅을 어떻게 고쳐야 하는지 알려주므로
+    쉼표가 들어 있어도 통째로 보존한다.
+    """
+
+    ok: bool
+    code: int = 0                            # ULD status (0 정상, 127 인자, 255 실패)
+    message: str = ""
+    reflectance_percent: int | None = None   # 성공했을 때만
+    nb_samples: int | None = None
+    distance_mm: int | None = None
+
+
+@dataclass(frozen=True)
 class Status:
     """``#`` 으로 시작하는 상태 메시지. 원문 그대로 보존한다."""
 
@@ -170,7 +188,42 @@ def _parse_tof(rest: str) -> ToFFrame | None:
     return _build(values, payload // _V2_PER_TARGET, t_us, seq)
 
 
-def parse_line(line: str) -> ToFFrame | Pong | Status | None:
+def _parse_xtalk(rest: str) -> XtalkResult | None:
+    """``XT,`` 뒤를 해석한다. 형식이 어긋나면 None."""
+    parts = rest.split(",")
+    kind = parts[0]
+
+    if kind == "cleared" or kind == "none":
+        return XtalkResult(ok=True, message=kind) if len(parts) == 1 else None
+
+    if kind == "ok":
+        if len(parts) != 4:
+            return None
+        try:
+            refl, samples, dist = (int(v) for v in parts[1:])
+        except ValueError:
+            return None
+        return XtalkResult(
+            ok=True,
+            reflectance_percent=refl,
+            nb_samples=samples,
+            distance_mm=dist,
+        )
+
+    if kind == "err":
+        if len(parts) < 3:
+            return None
+        try:
+            code = int(parts[1])
+        except ValueError:
+            return None
+        # 사유에 쉼표가 들어갈 수 있으므로 나머지를 통째로 되붙인다.
+        return XtalkResult(ok=False, code=code, message=",".join(parts[2:]))
+
+    return None
+
+
+def parse_line(line: str) -> ToFFrame | Pong | Status | XtalkResult | None:
     """시리얼 한 줄을 해석한다. 해석할 수 없으면 ``None``.
 
     호출자는 ``isinstance`` 로 분기한다. 예외를 던지지 않으므로 수신 루프에
@@ -181,6 +234,9 @@ def parse_line(line: str) -> ToFFrame | Pong | Status | None:
         return None
     if line.startswith("#"):
         return Status(text=line)
+    # 'XT,' 를 'F,'/'P,' 보다 먼저 본다 -- 접두사가 길어 오판 여지가 없다.
+    if line.startswith("XT,"):
+        return _parse_xtalk(line[3:])
     if line.startswith("F,"):
         return _parse_tof(line[2:])
     if line.startswith("P,"):
