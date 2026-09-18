@@ -68,14 +68,11 @@ def open_serial(port: str, baud: int = DEFAULT_BAUD) -> serial.Serial:
     return serial.Serial(port, baud, timeout=_READ_TIMEOUT_S)
 
 
-def drain_latest(ser: SerialLike, flip_lr: bool = False) -> Drained:
+def drain_latest(ser: SerialLike) -> Drained:
     """버퍼에 있는 줄을 전부 소비하고 가장 최신 프레임만 남긴다.
 
     ``in_waiting`` 이 0 이 될 때까지만 읽으므로 새 데이터를 기다리며 막히지
     않는다. 깨진 줄은 ``parse_line`` 이 None 을 주므로 그냥 넘어간다.
-
-    ``flip_lr`` 은 센서 장착 방향 보정이다. 여기(수집 경계)에서 한 번만
-    적용하면 표시·기록·캘리브레이션이 모두 같은 방향을 본다.
     """
     frame: ToFFrame | None = None
     pong: Pong | None = None
@@ -96,6 +93,4 @@ def drain_latest(ser: SerialLike, flip_lr: bool = False) -> Drained:
         elif isinstance(item, Status):
             statuses.append(item)
 
-    if flip_lr and frame is not None:
-        frame = frame.fliplr()
     return Drained(frame=frame, pong=pong, statuses=tuple(statuses), dropped=dropped)

@@ -83,24 +83,6 @@ class ToFFrame:
         out: NDArray[np.float64] = self.distance_mm[target]
         return out
 
-    def fliplr(self) -> ToFFrame:
-        """좌우를 뒤집은 새 프레임. 센서 장착 방향 보정용.
-
-        거리와 status 를 **함께** 뒤집는다. 하나만 뒤집으면 유효성 마스크가
-        어긋나 멀쩡한 zone 이 무효로 표시된다.
-
-        ponytail: 이 보정은 광학 구성에 딸린 값이다. 빔스플리터 반사가
-        손대칭을 한 번 더 뒤집으므로 BS 장착 후 반드시 다시 확인할 것.
-        Phase 3 의 호모그래피가 붙으면 이 플립까지 흡수하므로, 그때는
-        기본값을 끄고 H 하나로 통일하는 편이 낫다.
-        """
-        dist = np.ascontiguousarray(self.distance_mm[:, :, ::-1])
-        _freeze(dist)
-        stat: NDArray[np.int16] | None = None
-        if self.status is not None:
-            stat = np.ascontiguousarray(self.status[:, :, ::-1])
-            _freeze(stat)
-        return ToFFrame(distance_mm=dist, status=stat, t_us=self.t_us, seq=self.seq)
 
     def valid_mask(
         self, target: int = 0, accept: Sequence[int] = DEFAULT_STATUS_ACCEPT

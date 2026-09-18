@@ -15,3 +15,6 @@ __pycache__/
 # 실행 산출물 (재생성 가능)
 host/snapshots/
 host/session/
+
+# Office 임시 잠금 파일 (문서를 열어두면 생긴다)
+~$*

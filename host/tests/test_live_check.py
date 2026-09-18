@@ -74,14 +74,14 @@ def test_fps_measures_rate() -> None:
 # --- HUD 조립 --------------------------------------------------------------
 
 def test_hud_without_tof_says_waiting() -> None:
-    lines = lc.build_hud(_info(), "COM7", 115200, lc.Fps(), lc.Fps(), None, 1500.0, 0, True)
+    lines = lc.build_hud(_info(), "COM7", 115200, lc.Fps(), lc.Fps(), None, 1500.0, 0)
     assert any("대기" in ln for ln in lines)
     assert any("2592x1944" in ln for ln in lines)
 
 
 def test_hud_labels_v1_and_v2_protocol() -> None:
-    v1 = lc.build_hud(_info(), "COM7", 115200, lc.Fps(), lc.Fps(), _v1_frame(), 1500.0, 0, True)
-    v2 = lc.build_hud(_info(), "COM7", 921600, lc.Fps(), lc.Fps(), _v2_frame(), 1500.0, 0, True)
+    v1 = lc.build_hud(_info(), "COM7", 115200, lc.Fps(), lc.Fps(), _v1_frame(), 1500.0, 0)
+    v2 = lc.build_hud(_info(), "COM7", 921600, lc.Fps(), lc.Fps(), _v2_frame(), 1500.0, 0)
     assert any("[v1]" in ln for ln in v1)
     assert any("[v2]" in ln for ln in v2)
     # v1 에는 타임스탬프 줄이 없어야 한다.
@@ -92,7 +92,7 @@ def test_hud_labels_v1_and_v2_protocol() -> None:
 def test_hud_reports_valid_zone_count_and_range() -> None:
     dist = [-1] * 60 + [200, 300, 400, 500]
     lines = lc.build_hud(
-        _info(), "COM7", 115200, lc.Fps(), lc.Fps(), _v1_frame(dist), 1500.0, 0, True
+        _info(), "COM7", 115200, lc.Fps(), lc.Fps(), _v1_frame(dist), 1500.0, 0
     )
     assert any("유효  4/64" in ln for ln in lines)
     assert any("200~500mm" in ln for ln in lines)
@@ -101,14 +101,14 @@ def test_hud_reports_valid_zone_count_and_range() -> None:
 def test_hud_handles_all_invalid_frame() -> None:
     """전부 무효일 때 min/max 를 빈 배열에 부르면 터진다 -- 그 경로를 막는다."""
     lines = lc.build_hud(
-        _info(), "COM7", 115200, lc.Fps(), lc.Fps(), _v1_frame([-1] * 64), 1500.0, 0, True
+        _info(), "COM7", 115200, lc.Fps(), lc.Fps(), _v1_frame([-1] * 64), 1500.0, 0
     )
     assert any("측정 없음" in ln for ln in lines)
     assert any("유효  0/64" in ln for ln in lines)
 
 
 def test_hud_without_camera() -> None:
-    lines = lc.build_hud(None, None, 115200, lc.Fps(), lc.Fps(), None, 1500.0, 0, True)
+    lines = lc.build_hud(None, None, 115200, lc.Fps(), lc.Fps(), None, 1500.0, 0)
     assert any("없음" in ln for ln in lines)
     assert any("포트 없음" in ln for ln in lines)
 
@@ -198,40 +198,3 @@ def test_annotate_does_not_mutate_input() -> None:
     render.hud(img, ["x"])
     assert np.array_equal(img, before)
 
-
-# --- 좌우 반전 (센서 장착 방향) --------------------------------------------
-
-def test_hud_shows_flip_state() -> None:
-    """화면을 보며 F 로 맞추려면 지금 어느 쪽인지 보여야 한다."""
-    on = lc.build_hud(_info(), "COM7", 115200, lc.Fps(), lc.Fps(), None, 1500.0, 0, True)
-    off = lc.build_hud(_info(), "COM7", 115200, lc.Fps(), lc.Fps(), None, 1500.0, 0, False)
-    assert any("좌우반전 ON" in ln for ln in on)
-    assert any("좌우반전 OFF" in ln for ln in off)
-
-
-def test_flip_defaults_on_and_no_flip_turns_it_off() -> None:
-    """README 가 '기본값은 켬' 이라고 약속한다. 그 계약을 고정한다."""
-    assert lc.parse_args.__module__  # 스크립트가 로드되었는지
-    import sys as _sys
-
-    argv = _sys.argv
-    try:
-        _sys.argv = ["live_check.py"]
-        assert lc.parse_args().no_flip is False       # 기본 -> flip_lr = True
-        _sys.argv = ["live_check.py", "--no-flip"]
-        assert lc.parse_args().no_flip is True        # -> flip_lr = False
-    finally:
-        _sys.argv = argv
-
-
-def test_drain_applies_flip_at_collection_boundary() -> None:
-    """수집 경계에서 한 번만 뒤집어야 표시·기록·캘리브레이션이 같은 방향을 본다."""
-    from toffuse.tof_reader import drain_latest
-
-    from .test_tof_reader import FakeSerial
-
-    line = "F," + ",".join(str(v) for v in range(GRID * GRID))
-    plain = drain_latest(FakeSerial([line]))
-    flipped = drain_latest(FakeSerial([line]), flip_lr=True)
-    assert plain.frame is not None and flipped.frame is not None
-    assert flipped.frame.depth()[0, 0] == plain.frame.depth()[0, 7]
