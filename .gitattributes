@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.cpp text eol=lf
+*.ini text eol=lf
+*.pptx binary
