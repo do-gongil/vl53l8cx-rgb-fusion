@@ -227,31 +227,28 @@ class PolypSizing(Scene):
     def derivation(self):
         self.set_title("From datasheet to zone footprint")
 
-        # left: the FoV square with its diagonal, and the 8-zone strip
-        sq = Square(side_length=2.6, stroke_color=C_LINE).shift(4.2 * LEFT + 0.55 * UP)
-        diag = Line(sq.get_corner(DL), sq.get_corner(UR), color=C_IR, stroke_width=4)
-        diag_l = txt("65° diagonal", font_size=FS_SMALL, color=C_IR).next_to(sq, UP, buff=0.2)
-        strip = VGroup(*[
-            Square(side_length=2.6 / TOF_ZONES, stroke_color=GREY_D, stroke_width=1.5)
-            for _ in range(TOF_ZONES)
-        ]).arrange(RIGHT, buff=0).next_to(sq, DOWN, buff=0.18)
-        strip[3].set_fill(C_VIS, opacity=0.7)
-        per_zone = tof_side_fov_deg() / TOF_ZONES
-        strip_l = txt(f"{TOF_ZONES} × {per_zone:.2f}° = {tof_side_fov_deg():.1f}°", font_size=FS_SMALL, color=C_VIS)
-        strip_l.next_to(strip, DOWN, buff=0.2)
-        self.play(ShowCreation(sq), ShowCreation(diag), FadeIn(diag_l))
-
-        # right: the chain, every number computed
+        # The square is drawn in tangent space: half-side = tan(24.25 deg) = 0.4505,
+        # so its half-diagonal is automatically tan(32.5 deg) = 0.637.
         t_diag = math.tan(math.radians(TOF_FOV_DIAG_DEG / 2))
         t_side = t_diag / math.sqrt(2)
+        per_zone = tof_side_fov_deg() / TOF_ZONES
         k = 2 * math.tan(math.radians(per_zone / 2))
         z30 = zone_mm(WORK_D_MM)
         n = POLYP_DIAM_MM / z30
+
+        side = 2.6
+        sq = Square(side_length=side, stroke_color=C_LINE).shift(4.2 * LEFT + 0.55 * UP)
+        c = sq.get_center()
+        ur = sq.get_corner(UR)
+        mid_r = np.array([ur[0], c[1], 0])
+        diag = Line(sq.get_corner(DL), ur, color=C_IR, stroke_width=3)
+        diag_l = txt("65° diagonal", font_size=FS_SMALL, color=C_IR).next_to(sq, UP, buff=0.2)
+
         lines = VGroup(
             txt(f"datasheet: {TOF_FOV_DIAG_DEG:.0f}° diagonal FoV", font_size=FS_SMALL, color=GREY_B),
-            txt(f"tan({TOF_FOV_DIAG_DEG:.0f}°/2) = {t_diag:.3f}", font_size=FS_SMALL),
             txt(f"{TOF_FOV_DIAG_DEG:.0f}° / √2 = {TOF_FOV_DIAG_DEG / math.sqrt(2):.0f}°", font_size=FS_SMALL, color=C_WARN),
-            txt(f"{t_diag:.3f} / √2 = {t_side:.4f}", font_size=FS_SMALL),
+            txt(f"tan({TOF_FOV_DIAG_DEG:.0f}°/2) = {t_diag:.3f}", font_size=FS_SMALL, color=C_IR),
+            txt(f"{t_diag:.3f} / √2 = {t_side:.4f}", font_size=FS_SMALL, color=C_VIS),
             txt(f"side = 2·atan({t_side:.4f}) = {tof_side_fov_deg():.1f}°", font_size=FS_SMALL, color=C_VIS),
             txt(f"{tof_side_fov_deg():.1f}° / {TOF_ZONES} = {per_zone:.2f}° per zone", font_size=FS_SMALL),
             txt(f"zone = 2·d·tan({per_zone / 2:.2f}°) = {k:.3f}·d", font_size=FS_SMALL),
@@ -260,19 +257,74 @@ class PolypSizing(Scene):
         ).arrange(DOWN, buff=0.17, aligned_edge=LEFT)
         lines.next_to(sq, RIGHT, buff=1.3).align_to(diag_l, UP)
 
-        self.play(FadeIn(lines[0]))
-        self.play(FadeIn(lines[1]))
-        # the tempting wrong step: angles do not divide by sqrt(2), tangents do
-        wrong = lines[2]
-        cross = Cross(wrong, stroke_color=C_WARN, stroke_width=4)
-        self.play(FadeIn(wrong))
-        self.play(ShowCreation(cross))
-        self.play(FadeIn(lines[3]))
-        self.play(FadeIn(lines[4]), ShowCreation(strip), FadeIn(strip_l))
-        self.play(FadeIn(lines[5]), Indicate(strip[3], scale_factor=1.3))
-        self.play(FadeIn(lines[6]))
-        self.play(FadeIn(lines[7], shift=0.15 * UP))
-        self.play(FadeIn(lines[8], shift=0.15 * UP))
+        # 0. the spec: a diagonal
+        self.play(ShowCreation(sq), ShowCreation(diag), FadeIn(diag_l), FadeIn(lines[0]))
+
+        # 1. the tempting wrong step: divide the angle
+        fake = txt(f"{TOF_FOV_DIAG_DEG / math.sqrt(2):.0f}°?", font_size=FS_SMALL, color=C_WARN)
+        fake.next_to(sq, RIGHT, buff=0.15)
+        self.play(FadeIn(lines[1]), FadeIn(fake))
+        crosses = VGroup(Cross(lines[1], stroke_color=C_WARN, stroke_width=4),
+                         Cross(fake, stroke_color=C_WARN, stroke_width=4))
+        self.play(ShowCreation(crosses))
+
+        # 2. what actually has a value: the tangent of the half-diagonal
+        dot = Dot(c, color=WHITE, radius=0.05)
+        half_diag = Line(c, ur, color=C_IR, stroke_width=6)
+        hd_l = txt(f"{t_diag:.3f}", font_size=FS_SMALL, color=C_IR)
+        hd_l.move_to(half_diag.get_center() + 0.3 * UL)
+        self.play(FadeIn(lines[2]), FadeIn(dot), ShowCreation(half_diag), FadeIn(hd_l))
+
+        # 3. divide by sqrt(2): project the half-diagonal onto the side (45 deg triangle)
+        half_side = Line(c, mid_r, color=C_VIS, stroke_width=6)
+        leg = DashedLine(mid_r, ur, color=GREY_B, stroke_width=3)
+        hs_l = txt(f"{t_side:.4f}", font_size=FS_SMALL, color=C_VIS).next_to(half_side, DOWN, buff=0.12)
+        self.play(FadeIn(lines[3]), ShowCreation(half_side), ShowCreation(leg), FadeIn(hs_l))
+
+        # 4. the true side angle replaces the crossed-out guess
+        real = txt(f"{tof_side_fov_deg():.1f}°", font_size=FS_SMALL, color=C_VIS).move_to(fake)
+        side_hl = Line(sq.get_corner(DR), ur, color=C_VIS, stroke_width=6)
+        self.play(FadeIn(lines[4]), FadeOut(fake), FadeOut(crosses[1]),
+                  ShowCreation(side_hl), FadeIn(real))
+        self.wait(0.4)
+
+        # 5. one side = 8 zones
+        strip = VGroup(*[
+            Square(side_length=side / TOF_ZONES, stroke_color=GREY_D, stroke_width=1.5)
+            for _ in range(TOF_ZONES)
+        ]).arrange(RIGHT, buff=0).next_to(sq, DOWN, buff=0.18)
+        strip[3].set_fill(C_VIS, opacity=0.7)
+        strip_l = txt(f"{TOF_ZONES} × {per_zone:.2f}° = {tof_side_fov_deg():.1f}°", font_size=FS_SMALL, color=C_VIS)
+        strip_l.next_to(strip, DOWN, buff=0.2)
+        self.play(FadeIn(lines[5]), ShowCreation(strip), FadeIn(strip_l))
+        self.play(Indicate(strip[3], scale_factor=1.3))
+
+        # 6. one zone as a cone, drawn at its TRUE angle (6.06 deg) -- it really is that thin
+        apex = np.array([-6.5, -2.55, 0])
+        length = 3.5
+        half_h = length * math.tan(math.radians(per_zone / 2))
+        far = apex + length * RIGHT
+        top, bot = far + half_h * UP, far + half_h * DOWN
+        cone = VGroup(
+            Line(apex, top, color=C_IR, stroke_width=3),
+            Line(apex, bot, color=C_IR, stroke_width=3),
+            DashedLine(apex, far, color=GREY_D, stroke_width=2),
+            Line(top, bot, color=C_IR, stroke_width=6),
+        )
+        d_l = txt("d", font_size=FS_SMALL, color=GREY_B).next_to(cone[2], DOWN, buff=0.12)
+        z_l = txt(f"{k:.3f}·d", font_size=FS_SMALL, color=C_IR).next_to(cone[3], UP, buff=0.12)
+        self.play(FadeIn(lines[6]), ShowCreation(cone), FadeIn(d_l), FadeIn(z_l))
+
+        # 7. put in d = 30 mm
+        d_l2 = txt(f"{WORK_D_MM:.0f} mm", font_size=FS_SMALL, color=GREY_B).move_to(d_l)
+        z_l2 = txt(f"{z30:.1f} mm", font_size=FS_SMALL, color=C_IR).move_to(z_l)
+        self.play(FadeIn(lines[7], shift=0.15 * UP), Transform(d_l, d_l2), Transform(z_l, z_l2))
+
+        # 8. a 10 mm polyp over the zone strip
+        r = n * (side / TOF_ZONES) / 2
+        polyp = Circle(radius=r, fill_color=C_POLYP, fill_opacity=0.35, stroke_color=C_POLYP, stroke_width=3)
+        polyp.move_to(strip)
+        self.play(FadeIn(lines[8], shift=0.15 * UP), FadeOut(strip_l), GrowFromCenter(polyp))
         self.play(FlashAround(lines[8], time_width=1.5, run_time=1.5))
         self.wait(1.5)
         self.clear_beat()
