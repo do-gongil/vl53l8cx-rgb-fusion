@@ -1,0 +1,407 @@
+<title>ToF 내시경 용종 계측</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper: #F3F5F7;
+    --paper-2: #E9ECF0;
+    --ink: #1A1F27;
+    --ink-2: #4A5261;
+    --ink-3: #7B8494;
+    --rule: #D3D8DF;
+    --teal: #0F6F6B;
+    --teal-soft: #D9ECEA;
+    --amber: #B8651C;
+    --amber-soft: #F3E4D3;
+    --warn: #A93A3A;
+    --warn-soft: #F2DCDC;
+    --code-bg: #E7EAEE;
+    --serif: "Noto Serif KR", "Apple SD Gothic Neo", "Malgun Gothic", serif;
+    --sans: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", "Consolas", "D2Coding", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #141821; --paper-2: #1C212C; --ink: #E4E7EC; --ink-2: #AEB5C2; --ink-3: #7E8796;
+      --rule: #2C3340; --teal: #52B5AF; --teal-soft: #163B3A; --amber: #E0924E; --amber-soft: #3D2A17;
+      --warn: #E07777; --warn-soft: #3E2222; --code-bg: #1F2531;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #141821; --paper-2: #1C212C; --ink: #E4E7EC; --ink-2: #AEB5C2; --ink-3: #7E8796;
+    --rule: #2C3340; --teal: #52B5AF; --teal-soft: #163B3A; --amber: #E0924E; --amber-soft: #3D2A17;
+    --warn: #E07777; --warn-soft: #3E2222; --code-bg: #1F2531;
+  }
+
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 16px;
+         line-height: 1.75; padding-inline: 20px; padding-block: 0 96px; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  header.masthead { padding-block: 56px 32px; border-bottom: 1px solid var(--rule); }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+             color: var(--teal); margin: 0 0 14px; }
+  h1 { font-family: var(--serif); font-weight: 700; font-size: clamp(30px, 5vw, 42px); line-height: 1.25;
+       margin: 0 0 16px; text-wrap: balance; }
+  .lede { font-size: 18px; color: var(--ink-2); margin: 0; max-width: 62ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 22px; font-family: var(--mono);
+          font-size: 12.5px; color: var(--ink-3); }
+
+  nav.toc { margin-top: 36px; padding: 18px 22px; background: var(--paper-2); border-radius: 6px; }
+  nav.toc ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 32px; }
+  nav.toc li { break-inside: avoid; padding-block: 2px; }
+  nav.toc a { color: var(--ink); text-decoration: none; }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--teal); text-decoration: underline; }
+
+  section { padding-block: 44px 8px; }
+  section + section { border-top: 1px solid var(--rule); }
+  h2 { font-family: var(--serif); font-weight: 600; font-size: 26px; line-height: 1.3; margin: 0 0 18px;
+       text-wrap: balance; display: flex; gap: 14px; align-items: baseline; }
+  h2 .n { font-family: var(--mono); font-size: 14px; color: var(--teal); font-weight: 500; flex: none; }
+  h3 { font-family: var(--sans); font-weight: 700; font-size: 17px; margin: 30px 0 10px; }
+  p { margin: 0 0 14px; max-width: 70ch; }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; max-width: 70ch; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 700; }
+  code, .num { font-family: var(--mono); font-size: .92em; font-variant-numeric: tabular-nums; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
+  a { color: var(--teal); }
+  a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .callout { border-left: 3px solid var(--teal); background: var(--teal-soft); padding: 14px 18px;
+             border-radius: 0 6px 6px 0; margin: 20px 0; }
+  .callout.depth { border-color: var(--amber); background: var(--amber-soft); }
+  .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+  .callout .k { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+                display: block; margin-bottom: 6px; color: var(--ink-2); }
+
+  .tbl { overflow-x: auto; margin: 18px 0 22px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-weight: 700; color: var(--ink-2); font-size: 13px; letter-spacing: .02em; border-bottom-width: 2px; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  tr.hi td { background: var(--teal-soft); }
+  .tag { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 1px 7px; border-radius: 3px;
+         background: var(--paper-2); color: var(--ink-2); white-space: nowrap; }
+  .tag.todo { background: var(--amber-soft); color: var(--amber); }
+  .tag.done { background: var(--teal-soft); color: var(--teal); }
+
+  figure { margin: 22px 0 26px; }
+  figure svg { display: block; width: 100%; height: auto; max-width: 100%; }
+  figcaption { font-size: 13.5px; color: var(--ink-3); margin-top: 8px; max-width: 70ch; }
+  .fig-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 640px) { .fig-row { grid-template-columns: 1fr; } nav.toc ol { columns: 1; } }
+
+  .svg-ink { fill: var(--ink); } .svg-ink3 { fill: var(--ink-3); }
+  .svg-box { fill: var(--paper-2); stroke: var(--rule); stroke-width: 1.2; }
+  .svg-line { stroke: var(--ink-2); stroke-width: 1.4; fill: none; }
+  .svg-ir { stroke: var(--amber); stroke-width: 1.6; fill: none; stroke-dasharray: 5 4; }
+  .svg-dim { stroke: var(--amber); stroke-width: 1.6; fill: none; }
+  .svg-vis { stroke: var(--teal); stroke-width: 1.6; fill: none; }
+  .svg-teal { fill: var(--teal); } .svg-amber { fill: var(--amber); }
+  .svg-grid { stroke: var(--rule); stroke-width: 1; fill: var(--paper-2); }
+  .svg-polyp { fill: var(--amber); fill-opacity: .35; stroke: var(--amber); stroke-width: 1.6; }
+  .svg-cap { fill: var(--teal-soft); stroke: var(--teal); stroke-width: 1.6; }
+  .svg-t { font-family: var(--mono); font-size: 11px; }
+  .svg-tl { font-family: var(--sans); font-size: 12px; font-weight: 500; }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; margin: 20px 0; max-width: none; }
+  .steps li { counter-increment: step; display: grid; grid-template-columns: 44px 1fr; gap: 14px;
+              padding: 12px 0; border-top: 1px dashed var(--rule); margin: 0; }
+  .steps li::before { content: counter(step, decimal-leading-zero); font-family: var(--mono); font-size: 13px;
+                      color: var(--teal); padding-top: 3px; }
+  .steps li:last-child { border-bottom: 1px dashed var(--rule); }
+  .steps b { display: block; font-weight: 700; }
+  .steps span { display: block; color: var(--ink-2); font-size: 14.5px; }
+  .steps .src { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); }
+
+  .eq { font-family: var(--mono); font-size: 14.5px; background: var(--code-bg); padding: 8px 14px;
+        border-radius: 6px; display: inline-block; margin: 4px 0 10px; }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); font-size: 13px;
+           color: var(--ink-3); }
+</style>
+
+<div class="wrap">
+<header class="masthead">
+  <p class="eyebrow">기술 설계 문서 · 2026-09-19</p>
+  <h1>ToF 8×8 depth와 RGB 카메라로 내시경 용종의 크기를 추정한다</h1>
+  <p class="lede">목표에서 광학 설계, 그리고 실제로 무엇이 측정되고 무엇이 추정인지까지. 빔스플리터 동축 벤치가 왜 이 순서로 만들어지는지 설명한다.</p>
+  <div class="meta">
+    <span>VL53L8CX · 5MP 1/2.5" · f=3.6mm</span>
+    <span>저장소 vl53l8cx-rgb-fusion @ acc6b35</span>
+    <span>연구용 벤치 · 임상 장비 아님</span>
+  </div>
+  <nav class="toc" aria-label="목차">
+    <ol>
+      <li><a href="#goal">목표 — 왜 용종 크기인가</a></li>
+      <li><a href="#system">시스템 개요</a></li>
+      <li><a href="#optics">광학 설계와 네 가지 리스크</a></li>
+      <li><a href="#sensor">센서가 실제로 주는 것</a></li>
+      <li><a href="#pipeline">용종 크기 추정 파이프라인</a></li>
+      <li><a href="#budget">정확도 예산</a></li>
+      <li><a href="#validation">검증 계획 — 팬텀</a></li>
+      <li><a href="#roadmap">로드맵</a></li>
+      <li><a href="#limits">한계와 리스크</a></li>
+      <li><a href="#appendix">부록 — 수식과 현재 상태</a></li>
+    </ol>
+  </nav>
+</header>
+
+<section id="goal">
+  <h2><span class="n">01</span>목표 — 왜 용종 크기인가</h2>
+  <p>대장내시경에서 용종 크기는 처치를 가른다. <strong>5&nbsp;mm</strong>와 <strong>10&nbsp;mm</strong>가 기준선이다 — 절제 방법, 병리 의뢰 여부, 다음 검사 간격이 여기서 갈린다. 그런데 크기는 대부분 <em>눈으로</em> 추정되고, 육안 추정은 검사자 간 편차가 크며 체계적으로 과소·과대평가되는 것으로 알려져 있다. 겸자를 옆에 대고 비교하는 방법이 흔하지만 매번 할 수 없고 각도에 따라 흔들린다.</p>
+  <p>근본 원인은 하나다. <strong>단안 내시경 영상에는 절대 스케일이 없다.</strong> 같은 픽셀 크기의 용종이 20&nbsp;mm 앞의 5&nbsp;mm일 수도, 40&nbsp;mm 앞의 10&nbsp;mm일 수도 있다. 영상만으로는 둘을 구분할 수 없다.</p>
+  <div class="callout depth">
+    <span class="k">depth가 더하는 것</span>
+    <p>ToF 센서가 주는 <strong>거리 하나</strong>가 이 모호함을 푼다. 용종까지의 거리를 알면 픽셀 크기가 곧 mm 크기가 된다. 이 프로젝트의 핵심 가치는 정교한 3D 재구성이 아니라 <strong>영상에 절대 스케일을 붙이는 것</strong>이다. 부피는 그 위에 형상 모델을 얹어 얻는 2차 추정이다.</p>
+  </div>
+  <p>그래서 목표를 두 단계로 나눈다.</p>
+  <ul>
+    <li><strong>1차 출력 — 지름.</strong> 임상 기준선(5/10&nbsp;mm)과 직접 비교되고, 오차가 작고, 검증하기 쉽다.</li>
+    <li><strong>2차 출력 — 부피와 그 불확도.</strong> 높이 측정과 형상 가정이 필요하며 오차가 훨씬 크다. 왜 그런지는 <a href="#budget">6절</a>에서 숫자로 보인다.</li>
+  </ul>
+</section>
+
+<section id="system">
+  <h2><span class="n">02</span>시스템 개요</h2>
+  <p>ToF 센서와 RGB 카메라를 빔스플리터(BS)로 <strong>같은 광축</strong> 위에 놓는다. 시료에서 오는 빛은 BS에서 갈라져 투과분은 카메라로, 반사분은 ToF로 간다. ToF는 940&nbsp;nm 레이저를 스스로 쏘는 능동 센서이므로 그 빛도 같은 BS를 거쳐 나갔다가 돌아온다.</p>
+  <figure>
+    <svg viewBox="0 0 720 250" role="img" aria-label="시스템 배치도">
+      <rect x="600" y="70" width="14" height="110" rx="3" class="svg-amber" opacity=".8"/>
+      <text x="607" y="60" text-anchor="middle" class="svg-tl svg-ink">시료 / 용종</text>
+      <rect x="330" y="85" width="80" height="80" class="svg-box"/>
+      <line x1="336" y1="159" x2="404" y2="91" class="svg-line"/>
+      <text x="370" y="200" text-anchor="middle" class="svg-tl svg-ink">50:50 BS</text>
+      <rect x="60" y="100" width="110" height="50" rx="4" class="svg-box"/>
+      <rect x="170" y="112" width="18" height="26" class="svg-box"/>
+      <text x="115" y="130" text-anchor="middle" class="svg-tl svg-ink">RGB 카메라</text>
+      <text x="115" y="170" text-anchor="middle" class="svg-t svg-ink3">5MP · f=3.6mm</text>
+      <rect x="345" y="10" width="50" height="34" rx="4" class="svg-box"/>
+      <text x="370" y="31" text-anchor="middle" class="svg-t svg-ink">ToF</text>
+      <text x="420" y="24" class="svg-t svg-ink3">VL53L8CX 8×8</text>
+      <text x="420" y="38" class="svg-t svg-ink3">940nm · 15Hz</text>
+      <line x1="598" y1="125" x2="412" y2="125" class="svg-vis"/>
+      <line x1="328" y1="125" x2="190" y2="125" class="svg-vis"/>
+      <line x1="370" y1="46" x2="370" y2="83" class="svg-ir"/>
+      <line x1="370" y1="125" x2="598" y2="119" class="svg-ir"/>
+      <text x="500" y="112" text-anchor="middle" class="svg-t svg-teal">가시광 (투과)</text>
+      <text x="500" y="145" text-anchor="middle" class="svg-t svg-amber">940nm 왕복 (반사)</text>
+      <line x1="345" y1="27" x2="290" y2="27" class="svg-line"/>
+      <rect x="200" y="12" width="90" height="30" rx="4" class="svg-box"/>
+      <text x="245" y="31" text-anchor="middle" class="svg-t svg-ink">ESP32-S3</text>
+      <text x="245" y="55" text-anchor="middle" class="svg-t svg-ink3">I2C → 시리얼 921600</text>
+      <line x1="60" y1="125" x2="30" y2="125" class="svg-line"/>
+      <line x1="200" y1="27" x2="30" y2="27" class="svg-line"/>
+      <line x1="30" y1="27" x2="30" y2="215" class="svg-line"/>
+      <rect x="4" y="215" width="150" height="28" rx="4" class="svg-box"/>
+      <text x="79" y="233" text-anchor="middle" class="svg-t svg-ink">PC — 동기화 · 정합 · 추정</text>
+    </svg>
+    <figcaption>가시광은 BS를 투과해 카메라로, ToF의 940nm는 BS에서 반사되어 시료로 갔다가 같은 경로로 돌아온다. 두 스트림은 ESP32와 USB를 거쳐 PC에서 합쳐진다.</figcaption>
+  </figure>
+  <div class="callout">
+    <span class="k">이 배치를 고른 이유</span>
+    <p>광축이 겹치므로 <strong>시차(parallax)가 0</strong>이다. 그 결과 ToF의 8×8 zone과 카메라 픽셀 사이의 대응이 <strong>거리에 무관한 호모그래피 행렬 하나</strong>로 끝난다. 두 센서를 나란히 두는 스테레오식 배치였다면 거리마다 대응이 달라져 매번 다시 맞춰야 한다. 내시경 선단에는 이 벤치 그대로 들어가지 않지만, 시차 없는 이상 조건에서 <em>융합 알고리즘 자체</em>를 먼저 검증하는 데 이 배치가 가장 깨끗하다.</p>
+  </div>
+</section>
+
+<section id="optics">
+  <h2><span class="n">03</span>광학 설계와 네 가지 리스크</h2>
+  <p>동축 배치는 원리상 깔끔하지만 능동 IR 센서를 BS 뒤에 두는 것은 네 가지 물리 문제를 동시에 안는다. 각각을 벤치에서 판정하는 절차를 설계에 포함했다.</p>
+
+  <h3>R1 — BS 표면 반사가 SPAD로 되돌아온다 (최대 리스크)</h3>
+  <p>ToF는 자기 레이저를 쏘고 되돌아오는 시간을 잰다. BS 표면에서 곧바로 반사된 빛은 <strong>거리 ≈ 0의 강한 가짜 타깃</strong>으로 잡힌다. ST는 이런 커버글라스 crosstalk에 대한 내성을 <strong>60&nbsp;cm 이상</strong>에서만 보장하는데, 내시경 작동거리는 <strong>1~5&nbsp;cm</strong>다. 보정이 없으면 용종 반사광과 고스트의 히스토그램이 겹쳐 측정이 통째로 무너질 수 있다.</p>
+  <p>대응: <code>calibrate_xtalk()</code>를 <strong>광학계를 전부 조립한 뒤</strong> 실행하고 결과를 ESP32 NVS에 저장해 부팅마다 자동 적용한다. 이 절차는 이미 펌웨어와 <code>calib_xtalk.py</code>에 구현되어 있다. 그래도 안 되면 BS를 수 도 기울여 정반사를 개구 밖으로 보내거나, 막이 얇아 고스트가 거의 없는 펠리클 BS로 바꾼다.</p>
+  <div class="callout warn">
+    <span class="k">캘리브레이션의 함정</span>
+    <p>ULD는 보정용 타깃이 시야를 못 채우면 <strong>에러가 아니라 그럴듯한 틀린 값</strong>을 준다. ToF 시야가 48.5° 정사각이라 규격 최소 거리 600&nbsp;mm에서 <strong>54×54&nbsp;cm의 3% 반사율 타깃</strong>이 필요하다. 스크립트가 실행 전에 이 숫자를 띄우고 확인을 받는 이유다.</p>
+  </div>
+
+  <h3>R2 — 4x 줌을 어디에 두는가</h3>
+  <p>BS 시료측에 결상 렌즈를 놓으면 카메라는 문제없지만 ToF는 발광점(VCSEL)과 수광면(SPAD)이 수 mm 떨어져 있어서 <strong>조명 영역과 측정 영역이 시료면에서 어긋난다.</strong> 각도만 바꾸는 무초점(afocal) 변환기면 안전하고, 결상형 C마운트 줌은 벤치에서 먼저 판정한다. 어느 쪽이든 소프트웨어는 광학식에서 매핑을 유도하지 않고 <strong>캘리브레이션으로 측정</strong>하므로 코드는 바뀌지 않는다.</p>
+
+  <h3>R3 — 시야각 정합</h3>
+  <p>ToF 시야는 대각 65° = <strong>48.5°×48.5° 정사각</strong>. 카메라(1/2.5", f=3.6&nbsp;mm)는 76.7°×61.4°. 겹치는 비율은 탄젠트 비로 나온다:</p>
+  <div class="tbl"><table>
+    <tr><th>축</th><th class="num">ToF tan(½FoV)</th><th class="num">카메라 tan(½FoV)</th><th class="num">ToF가 덮는 비율</th></tr>
+    <tr><td>가로</td><td class="num">0.4505</td><td class="num">0.792</td><td class="num">57%</td></tr>
+    <tr><td>세로</td><td class="num">0.4505</td><td class="num">0.594</td><td class="num">76%</td></tr>
+  </table></div>
+  <p>화면 중앙 57%×76% 안에서만 depth가 있다. zone 하나는 2592×1944 기준 약 <span class="num">184&nbsp;px</span>. 용종은 화면 중앙에 두고 본다는 전제면 충분하다.</p>
+
+  <h3>R4 — 광로 길이 일치가 근거리에서 결정적이다</h3>
+  <p>BS→카메라 거리와 BS→ToF 거리가 Δ만큼 다르면 시차는 생기지 않지만 두 가상 시점이 광축 방향으로 어긋나, 물체거리 D에서 각배율 비가 <code>D/(D+Δ)</code>가 된다. 벤치(D=100~300&nbsp;mm)에서는 몇 % 수준이지만 <strong>내시경 거리에서는 mm 단위 오차가 두 자릿수 %가 된다.</strong></p>
+  <div class="tbl"><table>
+    <tr><th class="num">Δ (광로 차)</th><th class="num">D=30mm</th><th class="num">D=100mm</th><th class="num">D=300mm</th></tr>
+    <tr><td class="num">1 mm</td><td class="num">3.2%</td><td class="num">1.0%</td><td class="num">0.3%</td></tr>
+    <tr class="hi"><td class="num">5 mm</td><td class="num">14.3%</td><td class="num">4.8%</td><td class="num">1.6%</td></tr>
+    <tr><td class="num">10 mm</td><td class="num">25.0%</td><td class="num">9.1%</td><td class="num">3.2%</td></tr>
+  </table></div>
+  <p>그래서 캘리브레이션 절차에 <strong>동축 검증</strong>을 넣는다 — 서로 다른 두 거리에서 호모그래피를 각각 구해 비교하고, 유의미하게 다르면 BS 정렬을 다시 잡는다. 이 관문을 통과해야 "거리에 무관한 행렬 하나"라는 전제가 실제로 성립한다.</p>
+</section>
+
+<section id="sensor">
+  <h2><span class="n">04</span>센서가 실제로 주는 것</h2>
+  <p>"depth 센서"라는 말이 주는 인상과 달리 VL53L8CX는 <strong>64개 zone에 거리 하나씩</strong>을 준다. 각 zone은 시야 48.5°를 8로 나눈 <strong>6.06°</strong>의 원뿔이다. 내시경 거리에서 이게 얼마만한 발자국인지 계산하면 이 센서의 역할이 분명해진다.</p>
+  <div class="fig-row">
+    <figure>
+      <svg viewBox="0 0 300 300" role="img" aria-label="30mm 거리에서 10mm 용종이 8×8 zone 위에 차지하는 크기">
+        <rect x="20" y="20" width="260" height="260" class="svg-grid"/>
+        <g class="svg-grid">
+          <line x1="52.5" y1="20" x2="52.5" y2="280"/><line x1="85" y1="20" x2="85" y2="280"/>
+          <line x1="117.5" y1="20" x2="117.5" y2="280"/><line x1="150" y1="20" x2="150" y2="280"/>
+          <line x1="182.5" y1="20" x2="182.5" y2="280"/><line x1="215" y1="20" x2="215" y2="280"/>
+          <line x1="247.5" y1="20" x2="247.5" y2="280"/>
+          <line x1="20" y1="52.5" x2="280" y2="52.5"/><line x1="20" y1="85" x2="280" y2="85"/>
+          <line x1="20" y1="117.5" x2="280" y2="117.5"/><line x1="20" y1="150" x2="280" y2="150"/>
+          <line x1="20" y1="182.5" x2="280" y2="182.5"/><line x1="20" y1="215" x2="280" y2="215"/>
+          <line x1="20" y1="247.5" x2="280" y2="247.5"/>
+        </g>
+        <circle cx="150" cy="150" r="51" class="svg-polyp"/>
+        <text x="150" y="154" text-anchor="middle" class="svg-t svg-ink">10 mm</text>
+        <circle cx="85" cy="85" r="25.5" class="svg-polyp"/>
+        <text x="85" y="89" text-anchor="middle" class="svg-t svg-ink">5 mm</text>
+        <text x="150" y="296" text-anchor="middle" class="svg-t svg-ink3">zone 한 변 = 3.2 mm (d = 30 mm)</text>
+      </svg>
+      <figcaption>30&nbsp;mm 거리에서 8×8 그리드 위의 용종. 10&nbsp;mm 용종이 zone 약 3개, 5&nbsp;mm 용종이 1.6개를 덮는다. 형상을 잴 표본이 아니라 거리를 잴 표본이다.</figcaption>
+    </figure>
+    <div>
+      <div class="tbl"><table>
+        <tr><th class="num">거리</th><th class="num">zone 한 변</th><th class="num">5mm 용종</th><th class="num">10mm 용종</th></tr>
+        <tr><td class="num">20 mm</td><td class="num">2.1 mm</td><td class="num">2.4 zone</td><td class="num">4.7 zone</td></tr>
+        <tr class="hi"><td class="num">30 mm</td><td class="num">3.2 mm</td><td class="num">1.6 zone</td><td class="num">3.1 zone</td></tr>
+        <tr><td class="num">50 mm</td><td class="num">5.3 mm</td><td class="num">0.9 zone</td><td class="num">1.9 zone</td></tr>
+      </table></div>
+      <p style="font-size:14.5px">zone 발자국 = <code>2·d·tan(3.03°)</code> = <code>0.106·d</code></p>
+    </div>
+  </div>
+  <div class="callout depth">
+    <span class="k">결론</span>
+    <p><strong>ToF는 용종의 3D 형상을 주지 않는다.</strong> 주는 것은 두 가지다.</p>
+    <ul>
+      <li><strong>스케일</strong> — 용종까지 거리 <span class="num">d</span>. 이것으로 픽셀이 mm가 된다: <code>mm/px = Z / f_px</code>, <span class="num">f_px = 3.6 / 0.0022 = 1636</span>.</li>
+      <li><strong>높이</strong> — 용종 중심 zone의 거리와 둘레 점막 zone의 거리의 차. 용종이 zone 2개 이상을 덮을 때만 분리된다.</li>
+    </ul>
+  </div>
+  <h3>거리는 radial이다, Z가 아니다</h3>
+  <p>각 zone은 자기 시선 방향을 따라 <strong>직선거리</strong>를 잰다. 광축에서 벗어난 zone은 같은 평면을 보면서도 더 먼 값을 낸다. zone 중심 기준 최대 편각은 약 21°(대각 29°)로 <code>cos</code> 보정 <strong>최대 약 12%</strong>, zone 가장자리까지 치면 16%다. 높이 <span class="num">h</span>는 광축 방향 차이여야 하므로 <code>Z = d·cosθ</code> 환산이 필요하다. 평면 시료가 가운데는 맞고 모서리가 멀게 보이면 이 보정이 빠진 것이다.</p>
+</section>
+
+<section id="pipeline">
+  <h2><span class="n">05</span>용종 크기 추정 파이프라인</h2>
+  <p>동기화된 RGB 프레임 하나와 ToF 프레임 하나에서 지름·높이·부피를 뽑는 순서다. 순서는 의존 관계다 — 스케일을 알아야 지름이, 지름과 높이를 알아야 부피가 나온다.</p>
+  <ol class="steps">
+    <li><div><b>동기 프레임 쌍 확보</b><span>ToF(15&nbsp;Hz) 프레임을 기준으로 최근접 카메라 프레임을 짝짓는다. 장치 클럭 오프셋은 왕복 ping으로 추정하고 드리프트를 추적한다.</span><span class="src">pairing.py · clock.py — Phase 2</span></div></li>
+    <li><div><b>RGB에서 용종 분할</b><span>지금은 수동 ROI. 이후 자동 분할로 대체하되 파이프라인은 그대로다.</span><span class="src">fusion_view.py ROI — Phase 4</span></div></li>
+    <li><div><b>ROI → zone 매핑</b><span>호모그래피 역변환으로 ROI가 덮는 zone 집합을 구한다. 렌즈 왜곡은 먼저 보정한다.</span><span class="src">mapping.py · calib_grid.py — Phase 3</span></div></li>
+    <li><div><b>용종 거리 d<sub>p</sub></b><span>ROI 안 유효 zone들의 <strong>중앙값</strong>. 가장자리 무효값에 강하다. status 5/6/9만 채택.</span><span class="src">mapping.py</span></div></li>
+    <li><div><b>점막 거리 d<sub>m</sub></b><span>ROI를 둘러싼 한 겹의 zone 중앙값. 용종이 자라난 바닥면의 거리다.</span><span class="src">mapping.py</span></div></li>
+    <li><div><b>스케일</b><span><code>s = d_p / 1636</code> mm/px. 30&nbsp;mm에서 0.018&nbsp;mm/px — 10&nbsp;mm 용종이 545&nbsp;px. RGB 해상도는 병목이 아니다.</span><span class="src">sizing.py — 신규</span></div></li>
+    <li><div><b>지름</b><span>분할 마스크의 장축·단축 × s. <strong>1차 출력.</strong></span><span class="src">sizing.py</span></div></li>
+    <li><div><b>높이</b><span><code>h = Z(d_m) − Z(d_p)</code>, radial→Z 환산 후. 용종이 zone 2개 이상을 덮지 못하면 <em>측정 불가</em>로 보고한다.</span><span class="src">sizing.py · radial_to_z()</span></div></li>
+    <li><div><b>부피 — 형상 모델</b><span>Paris 분류로 prior를 고른다. 무경성(Is/IIa)은 구관, 유경성(Ip)은 타원체. <strong>2차 출력.</strong></span><span class="src">sizing.py</span></div></li>
+    <li><div><b>불확도 전파</b><span>ULD가 zone별로 주는 <code>range_sigma_mm</code>을 스트리밍해 지름·높이·부피 각각에 σ를 붙인다.</span><span class="src">펌웨어 프로토콜 v2 확장 — 신규</span></div></li>
+  </ol>
+  <figure>
+    <svg viewBox="0 0 520 190" role="img" aria-label="구관 모델의 기하">
+      <line x1="30" y1="140" x2="490" y2="140" class="svg-line"/>
+      <text x="490" y="158" text-anchor="end" class="svg-t svg-ink3">점막 (d_m)</text>
+      <path d="M 150 140 A 130 130 0 0 1 370 140 Z" class="svg-cap"/>
+      <line x1="260" y1="140" x2="370" y2="140" class="svg-dim"/>
+      <line x1="260" y1="134" x2="260" y2="146" class="svg-line"/>
+      <line x1="370" y1="134" x2="370" y2="146" class="svg-line"/>
+      <text x="315" y="160" text-anchor="middle" class="svg-t svg-amber">a (RGB × 스케일)</text>
+      <line x1="260" y1="140" x2="260" y2="76" class="svg-dim"/>
+      <line x1="254" y1="76" x2="266" y2="76" class="svg-line"/>
+      <text x="248" y="112" text-anchor="end" class="svg-t svg-amber">h (ToF)</text>
+      <text x="260" y="40" text-anchor="middle" class="svg-tl svg-ink">V = (π·h / 6) · (3a² + h²)</text>
+      <text x="260" y="58" text-anchor="middle" class="svg-t svg-ink3">a = 5, h = 3 → 132 mm³</text>
+    </svg>
+    <figcaption>무경성 용종의 구관(spherical cap) 모델. 밑면 반지름 a는 RGB 분할에서, 높이 h는 ToF 두 거리의 차에서 온다. 형상은 측정이 아니라 <em>가정</em>이다.</figcaption>
+  </figure>
+</section>
+
+<section id="budget">
+  <h2><span class="n">06</span>정확도 예산 — 왜 지름을 앞세우는가</h2>
+  <p>ToF 거리 한 번의 표준편차를 σ<sub>d</sub>라 하자. 이 값은 추정하지 않고 벤치에서 <strong>실측</strong>한다(<code>calib_range.py</code>). 예시로 σ<sub>d</sub>=1.5&nbsp;mm, 작동거리 30&nbsp;mm, 지름 10&nbsp;mm, 높이 3&nbsp;mm인 용종을 잡으면:</p>
+  <div class="tbl"><table>
+    <tr><th>출력</th><th>오차의 근원</th><th class="num">상대 오차</th><th>비고</th></tr>
+    <tr class="hi"><td><strong>지름</strong></td><td>스케일 오차 = σ<sub>d</sub> / d</td><td class="num">≈ 5%</td><td>거리 한 번의 오차가 그대로 스케일 오차. 분할 오차는 별도.</td></tr>
+    <tr><td><strong>높이</strong></td><td>두 거리의 차 → √2·σ<sub>d</sub> = 2.1&nbsp;mm, 높이 3&nbsp;mm 대비</td><td class="num">≈ 70%</td><td>절대 오차는 같은데 분모가 작다.</td></tr>
+    <tr><td><strong>부피</strong></td><td>h에 선형, a에 제곱 → 두 오차가 합산·증폭</td><td class="num">&gt; 70%</td><td>형상 가정 오차는 별도로 더해진다.</td></tr>
+  </table></div>
+  <p>같은 센서, 같은 오차인데 <strong>지름은 쓸 만하고 높이는 아니다.</strong> 이유는 단순하다 — 지름은 거리 <em>하나</em>를 곱하는 것이고, 높이는 비슷한 두 거리를 <em>빼는</em> 것이라 상대 오차가 폭발한다. 그래서 이 프로젝트는 지름을 1차 출력으로, 부피는 불확도를 반드시 함께 붙인 2차 출력으로 둔다.</p>
+  <div class="callout">
+    <span class="k">높이 오차를 줄이는 길</span>
+    <p>여러 프레임을 평균하면 σ가 √N으로 줄고(15&nbsp;Hz라 1초에 15장), zone별 <code>range_sigma_mm</code>로 신뢰도가 낮은 zone에 낮은 가중치를 줄 수 있다. 둘 다 파이프라인 10단계에 들어간다. 그래도 높이는 지름보다 근본적으로 나쁘다 — 그 사실을 숨기지 않는 것이 이 문서의 입장이다.</p>
+  </div>
+</section>
+
+<section id="validation">
+  <h2><span class="n">07</span>검증 계획 — 팬텀</h2>
+  <p>참값을 아는 물체로 검증한다. 3D 프린팅 구관 팬텀을 곡면 "점막" 위에 놓고 거리·크기 매트릭스로 측정한다. 문헌의 표준 방식이며 비용이 거의 들지 않는다.</p>
+  <div class="tbl"><table>
+    <tr><th>변수</th><th>수준</th><th>목적</th></tr>
+    <tr><td>지름</td><td class="num">3 · 5 · 8 · 10 · 15 mm</td><td>임상 기준선(5/10) 양쪽을 덮는다</td></tr>
+    <tr><td>높이</td><td class="num">2 · 4 · 8 mm</td><td>구관 모델의 h 축 검증</td></tr>
+    <tr><td>거리</td><td class="num">20 · 30 · 50 mm</td><td>내시경 작동거리. 벤치 확장(100·200&nbsp;mm)은 기준선용</td></tr>
+    <tr><td>반사율</td><td>무광 분홍 · 젖은 광택</td><td>점막 조건 근사. 정반사 영향 확인</td></tr>
+    <tr><td>배경</td><td>평면 · 곡률 반경 30&nbsp;mm</td><td>점막 거리 d<sub>m</sub> 추정이 곡면에서 버티는지</td></tr>
+  </table></div>
+  <p>합격 기준은 확정 항목이다. 문헌에서 컴퓨터 보조 크기 추정이 보고하는 수준을 참고해 <strong>지름 오차 &lt; 10%(또는 &lt; 1&nbsp;mm 중 큰 쪽)</strong>를 1차 기준으로 제안한다. 높이·부피는 불확도 표기의 <em>정직성</em>을 기준으로 본다 — 보고한 σ 안에 참값이 들어오는 비율.</p>
+</section>
+
+<section id="roadmap">
+  <h2><span class="n">08</span>로드맵</h2>
+  <p>기존 계획(Phase 0~5)에 목표가 요구하는 항목을 더한 것이다. 상태는 2026-09-19 기준.</p>
+  <div class="tbl"><table>
+    <tr><th>단계</th><th>내용</th><th>상태</th></tr>
+    <tr><td>0</td><td>두 장치 동시 표시 <code>live_check.py</code>, 프로토콜 v1/v2 자동 판별</td><td><span class="tag done">완료</span></td></tr>
+    <tr><td>1</td><td>펌웨어 v2 — 타임스탬프 · status 원본 · ping · LED · <strong>xtalk 캘리브레이션</strong></td><td><span class="tag done">완료</span></td></tr>
+    <tr><td>0.5</td><td>광학 go/no-go 벤치 — BS crosstalk(R1), 줌 위치(R2), 940nm 카메라 감도(R4)</td><td><span class="tag todo">하드웨어</span></td></tr>
+    <tr><td>2</td><td>시간 동기 — 카메라 스레드, 클럭 오프셋, 지연 실측, 페어링</td><td><span class="tag">예정</span></td></tr>
+    <tr><td>3</td><td>공간 정합 — 내부 파라미터, 호모그래피, <strong>동축 검증</strong>, <strong>radial→Z</strong></td><td><span class="tag">예정</span></td></tr>
+    <tr><td>4</td><td>프로브 · ROI · 세션 녹화 · 거리 선형 보정</td><td><span class="tag">예정</span></td></tr>
+    <tr><td>4+</td><td><strong>용종 계측</strong> — <code>sizing.py</code>(지름 · 높이 · 구관/타원체 부피 · 불확도), 펌웨어 <code>range_sigma_mm</code> 스트리밍</td><td><span class="tag todo">신규</span></td></tr>
+    <tr><td>5</td><td>팬텀 검증 매트릭스 실행, 합격 기준 판정</td><td><span class="tag todo">신규</span></td></tr>
+    <tr><td>6</td><td>줌 프로파일(4x), 필요 시 단안 깊이 추정과의 결합 검토</td><td><span class="tag">후보</span></td></tr>
+  </table></div>
+</section>
+
+<section id="limits">
+  <h2><span class="n">09</span>한계와 리스크</h2>
+  <ul>
+    <li><strong>이 벤치는 원리 검증용이다.</strong> BS + 5MP 카메라 + 3.6&nbsp;mm 렌즈는 내시경 선단에 들어가지 않는다. 실제 통합은 선단 병렬 배치(시차 발생 → 근거리 캘리브레이션으로 흡수)나 다이크로익 프리즘이 될 것이다. 동축 벤치의 역할은 그 전에 시차 없는 조건에서 알고리즘을 확정하는 것이다.</li>
+    <li><strong>1~5&nbsp;cm는 VL53L8CX의 근거리 한계 부근이고 crosstalk가 가장 심한 구간이다.</strong> Phase 0.5에서 안 되면 이 센서로는 안 되는 것이다. 그때 대안은 <em>단안 깊이 추정(dense, 상대값) + ToF(sparse, 절대 스케일 앵커)</em> 결합 — 내시경 크기 추정의 최신 방향이며, 그 구성에서도 ToF의 역할(스케일)은 남는다.</li>
+    <li><strong>부피는 형상 가정에 묶여 있다.</strong> Paris 분류가 틀리거나 불규칙한 용종이면 구관·타원체 모델 자체가 맞지 않는다. 문서와 출력 모두에 "모델 기반 추정"임을 명시한다.</li>
+    <li><strong>젖은 점막의 정반사, 연동운동, 스코프 움직임.</strong> 정반사는 ToF 반환을 망치고, 움직임은 두 스트림의 시간 동기를 요구한다. Phase 2의 동기화가 장식이 아니라 필수가 되는 이유다.</li>
+    <li><strong>연구용 벤치이며 임상 장비가 아니다.</strong> 이 문서의 어떤 수치도 진단 근거로 쓰이지 않는다.</li>
+  </ul>
+</section>
+
+<section id="appendix">
+  <h2><span class="n">10</span>부록 — 수식과 현재 상태</h2>
+  <h3>수식</h3>
+  <p>ToF 시야 한 변: <span class="eq">2·atan(tan(32.5°)/√2) = 48.5°</span></p>
+  <p>zone 발자국(한 변): <span class="eq">2·d·tan(48.5°/16) = 0.106·d</span></p>
+  <p>픽셀 초점거리: <span class="eq">f_px = f / 화소피치 = 3.6 / 0.0022 = 1636 px</span></p>
+  <p>스케일: <span class="eq">s [mm/px] = Z / f_px</span></p>
+  <p>radial → Z: <span class="eq">Z = d · cos θ_zone</span></p>
+  <p>구관 부피: <span class="eq">V = (π·h/6)·(3a² + h²)</span> &nbsp; 타원체: <span class="eq">V = (4/3)·π·a·b·c</span></p>
+  <p>광로 차 배율 오차: <span class="eq">1 − D/(D+Δ)</span></p>
+  <p>지름 상대 오차: <span class="eq">σ_d / d</span> &nbsp; 높이 절대 오차: <span class="eq">√2 · σ_d</span></p>
+
+  <h3>저장소 상태 (커밋 acc6b35)</h3>
+  <div class="tbl"><table>
+    <tr><th>구성 요소</th><th>내용</th></tr>
+    <tr><td><code>firmware/</code></td><td>ESP32-S3 + VL53L8CX, 프로토콜 v2, xtalk 캘리브레이션(NVS 저장·복원). 빌드 RAM 7.7% · Flash 6.7%</td></tr>
+    <tr><td><code>host/src/toffuse/</code></td><td><code>protocol</code>(100% 커버) · <code>tof_reader</code> · <code>render</code> · <code>camera</code> · <code>console</code></td></tr>
+    <tr><td><code>host/scripts/</code></td><td><code>live_check.py</code> · <code>calib_xtalk.py</code></td></tr>
+    <tr><td>검증</td><td>테스트 116개 통과 · 커버리지 85% · mypy strict · ruff</td></tr>
+    <tr><td>저장소</td><td><a href="https://github.com/do-gongil/vl53l8cx-rgb-fusion">vl53l8cx-rgb-fusion</a> · 센서 단독 예제 <a href="https://github.com/do-gongil/esp32-vl53l8cx-tof">esp32-vl53l8cx-tof</a></td></tr>
+  </table></div>
+  <p>이 문서가 언급하지만 아직 코드에 없는 것: <code>sizing.py</code>, <code>radial_to_z()</code>, <code>range_sigma_mm</code> 스트리밍, 팬텀 스크립트, Phase 2~5 전체. 로드맵의 상태 열이 기준이다.</p>
+</section>
+
+<footer>
+  ToF 내시경 용종 계측 — 기술 설계 문서. 수치는 계획서와 코드에서 재계산 가능하도록 부록에 수식을 두었다.
+</footer>
+</div>
