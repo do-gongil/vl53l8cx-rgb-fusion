@@ -78,6 +78,7 @@ class PolypSizing(Scene):
         self.no_scale()
         self.one_distance()
         self.optics()
+        self.derivation()
         self.what_sensor_gives()
         self.volume_model()
         self.accuracy()
@@ -97,7 +98,7 @@ class PolypSizing(Scene):
     # -- 0. title ------------------------------------------------------------
     def opening(self):
         t1 = txt("Endoscopic Polyp Sizing", font_size=52)
-        t2 = txt("ToF 8×8 depth  +  RGB camera", font_size=FS_BODY, color=GREY_B)
+        t2 = txt("VL53L8 8×8 ToF  +  RGB camera", font_size=FS_BODY, color=GREY_B)
         t2.next_to(t1, DOWN, buff=0.4)
         self.play(Write(t1))
         self.play(FadeIn(t2, shift=0.3 * UP))
@@ -107,7 +108,7 @@ class PolypSizing(Scene):
 
     # -- 1. the problem ------------------------------------------------------
     def no_scale(self):
-        self.set_title("1. No absolute scale")
+        self.set_title("No absolute scale")
 
         # endoscope view: circular frame + polyp blob
         frame = Circle(radius=2.2, stroke_color=C_LINE, stroke_width=3).shift(1.6 * LEFT)
@@ -134,7 +135,7 @@ class PolypSizing(Scene):
 
     # -- 2. one distance ------------------------------------------------------
     def one_distance(self):
-        self.set_title("2. One distance → scale")
+        self.set_title("One distance → scale")
         scene = self.polyp_scene
         polyp = self.polyp
 
@@ -165,7 +166,7 @@ class PolypSizing(Scene):
 
     # -- 3. optical layout ----------------------------------------------------
     def optics(self):
-        self.set_title("3. Coaxial optics — beam splitter")
+        self.set_title("Coaxial optics — beam splitter")
 
         # positions along the common axis (y = 0)
         cam = RoundedRectangle(width=1.8, height=0.9, corner_radius=0.1, stroke_color=C_LINE).shift(4.6 * LEFT)
@@ -222,9 +223,63 @@ class PolypSizing(Scene):
         self.wait(1.5)
         self.clear_beat()
 
+    # -- 3b. derivation: datasheet -> zone footprint --------------------------
+    def derivation(self):
+        self.set_title("From datasheet to zone footprint")
+
+        # left: the FoV square with its diagonal, and the 8-zone strip
+        sq = Square(side_length=2.6, stroke_color=C_LINE).shift(4.2 * LEFT + 0.55 * UP)
+        diag = Line(sq.get_corner(DL), sq.get_corner(UR), color=C_IR, stroke_width=4)
+        diag_l = txt("65° diagonal", font_size=FS_SMALL, color=C_IR).next_to(sq, UP, buff=0.2)
+        strip = VGroup(*[
+            Square(side_length=2.6 / TOF_ZONES, stroke_color=GREY_D, stroke_width=1.5)
+            for _ in range(TOF_ZONES)
+        ]).arrange(RIGHT, buff=0).next_to(sq, DOWN, buff=0.18)
+        strip[3].set_fill(C_VIS, opacity=0.7)
+        per_zone = tof_side_fov_deg() / TOF_ZONES
+        strip_l = txt(f"{TOF_ZONES} × {per_zone:.2f}° = {tof_side_fov_deg():.1f}°", font_size=FS_SMALL, color=C_VIS)
+        strip_l.next_to(strip, DOWN, buff=0.2)
+        self.play(ShowCreation(sq), ShowCreation(diag), FadeIn(diag_l))
+
+        # right: the chain, every number computed
+        t_diag = math.tan(math.radians(TOF_FOV_DIAG_DEG / 2))
+        t_side = t_diag / math.sqrt(2)
+        k = 2 * math.tan(math.radians(per_zone / 2))
+        z30 = zone_mm(WORK_D_MM)
+        n = POLYP_DIAM_MM / z30
+        lines = VGroup(
+            txt(f"datasheet: {TOF_FOV_DIAG_DEG:.0f}° diagonal FoV", font_size=FS_SMALL, color=GREY_B),
+            txt(f"tan({TOF_FOV_DIAG_DEG:.0f}°/2) = {t_diag:.3f}", font_size=FS_SMALL),
+            txt(f"{TOF_FOV_DIAG_DEG:.0f}° / √2 = {TOF_FOV_DIAG_DEG / math.sqrt(2):.0f}°", font_size=FS_SMALL, color=C_WARN),
+            txt(f"{t_diag:.3f} / √2 = {t_side:.4f}", font_size=FS_SMALL),
+            txt(f"side = 2·atan({t_side:.4f}) = {tof_side_fov_deg():.1f}°", font_size=FS_SMALL, color=C_VIS),
+            txt(f"{tof_side_fov_deg():.1f}° / {TOF_ZONES} = {per_zone:.2f}° per zone", font_size=FS_SMALL),
+            txt(f"zone = 2·d·tan({per_zone / 2:.2f}°) = {k:.3f}·d", font_size=FS_SMALL),
+            txt(f"d = {WORK_D_MM:.0f} mm  →  zone = {z30:.1f} mm", font_size=FS_BODY, color=C_IR),
+            txt(f"{POLYP_DIAM_MM:.0f} mm / {z30:.1f} mm = {n:.1f} zones", font_size=FS_BODY, color=C_POLYP),
+        ).arrange(DOWN, buff=0.17, aligned_edge=LEFT)
+        lines.next_to(sq, RIGHT, buff=1.3).align_to(diag_l, UP)
+
+        self.play(FadeIn(lines[0]))
+        self.play(FadeIn(lines[1]))
+        # the tempting wrong step: angles do not divide by sqrt(2), tangents do
+        wrong = lines[2]
+        cross = Cross(wrong, stroke_color=C_WARN, stroke_width=4)
+        self.play(FadeIn(wrong))
+        self.play(ShowCreation(cross))
+        self.play(FadeIn(lines[3]))
+        self.play(FadeIn(lines[4]), ShowCreation(strip), FadeIn(strip_l))
+        self.play(FadeIn(lines[5]), Indicate(strip[3], scale_factor=1.3))
+        self.play(FadeIn(lines[6]))
+        self.play(FadeIn(lines[7], shift=0.15 * UP))
+        self.play(FadeIn(lines[8], shift=0.15 * UP))
+        self.play(FlashAround(lines[8], time_width=1.5, run_time=1.5))
+        self.wait(1.5)
+        self.clear_beat()
+
     # -- 4. what the sensor gives ---------------------------------------------
     def what_sensor_gives(self):
-        self.set_title("4. What 8×8 actually gives")
+        self.set_title("What 8×8 actually gives")
 
         side = 5.2
         cell = side / TOF_ZONES
@@ -262,7 +317,7 @@ class PolypSizing(Scene):
 
     # -- 5. volume model ------------------------------------------------------
     def volume_model(self):
-        self.set_title("5. Volume — a model, not a measurement")
+        self.set_title("Volume — a model, not a measurement")
 
         a_mm, h_mm = POLYP_DIAM_MM / 2, POLYP_H_MM
         u = 0.42                                   # scene units per mm
@@ -298,7 +353,7 @@ class PolypSizing(Scene):
 
     # -- 6. accuracy budget -----------------------------------------------------
     def accuracy(self):
-        self.set_title("6. Accuracy budget")
+        self.set_title("Accuracy budget")
 
         e_d = diameter_rel_err(SIGMA_D_MM, WORK_D_MM)
         e_h = height_rel_err(SIGMA_D_MM, POLYP_H_MM)
