@@ -18,3 +18,7 @@ host/session/
 
 # Office 임시 잠금 파일 (문서를 열어두면 생긴다)
 ~$*
+
+# ManimGL 렌더 산출물
+docs/video/videos/
+docs/video/frames/
