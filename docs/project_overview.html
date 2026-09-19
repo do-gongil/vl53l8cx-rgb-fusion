@@ -163,7 +163,7 @@
 
 <section id="system">
   <h2><span class="n">02</span>시스템 개요</h2>
-  <p>ToF 센서와 RGB 카메라를 빔스플리터(BS)로 <strong>같은 광축</strong> 위에 놓는다. 시료에서 오는 빛은 BS에서 갈라져 투과분은 카메라로, 반사분은 ToF로 간다. ToF는 940&nbsp;nm 레이저를 스스로 쏘는 능동 센서이므로 그 빛도 같은 BS를 거쳐 나갔다가 돌아온다.</p>
+  <p>ToF 센서와 RGB 카메라를 빔스플리터(BS)로 <strong>같은 광축</strong> 위에 놓는다. 시료에서 오는 빛은 BS에서 갈라져 투과분은 카메라로, 반사분은 ToF로 간다. ToF는 940&nbsp;nm 레이저를 스스로 쏘는 능동 센서이므로 그 빛도 같은 BS를 거쳐 나갔다가 돌아온다. BS의 시료측 끝단, 즉 두 센서가 공유하는 경로에 <strong>4x 줌 렌즈</strong>를 두어 카메라와 ToF의 배율을 동시에 올린다.</p>
   <figure>
     <svg viewBox="0 0 720 250" role="img" aria-label="시스템 배치도">
       <rect x="600" y="70" width="14" height="110" rx="3" class="svg-amber" opacity=".8"/>
@@ -183,8 +183,13 @@
       <line x1="328" y1="125" x2="190" y2="125" class="svg-vis"/>
       <line x1="370" y1="46" x2="370" y2="83" class="svg-ir"/>
       <line x1="370" y1="125" x2="598" y2="119" class="svg-ir"/>
-      <text x="500" y="112" text-anchor="middle" class="svg-t svg-teal">가시광 (투과)</text>
-      <text x="500" y="145" text-anchor="middle" class="svg-t svg-amber">940nm 왕복 (반사)</text>
+      <text x="462" y="110" text-anchor="middle" class="svg-t svg-teal">가시광 (투과)</text>
+      <text x="462" y="147" text-anchor="middle" class="svg-t svg-amber">940nm 왕복 (반사)</text>
+      <!-- 4x 줌 렌즈: BS 시료측 공통 경로 위 -->
+      <path d="M 532 84 Q 550 125 532 166 Q 514 125 532 84 Z" class="svg-box"/>
+      <line x1="532" y1="78" x2="532" y2="172" class="svg-line" stroke-dasharray="2 3"/>
+      <text x="532" y="188" text-anchor="middle" class="svg-tl svg-ink">4x 줌 렌즈</text>
+      <text x="532" y="203" text-anchor="middle" class="svg-t svg-ink3">공통 경로 · R2</text>
       <line x1="345" y1="27" x2="290" y2="27" class="svg-line"/>
       <rect x="200" y="12" width="90" height="30" rx="4" class="svg-box"/>
       <text x="245" y="31" text-anchor="middle" class="svg-t svg-ink">ESP32-S3</text>
@@ -195,7 +200,7 @@
       <rect x="4" y="215" width="150" height="28" rx="4" class="svg-box"/>
       <text x="79" y="233" text-anchor="middle" class="svg-t svg-ink">PC — 동기화 · 정합 · 추정</text>
     </svg>
-    <figcaption>가시광은 BS를 투과해 카메라로, ToF의 940nm는 BS에서 반사되어 시료로 갔다가 같은 경로로 돌아온다. 두 스트림은 ESP32와 USB를 거쳐 PC에서 합쳐진다.</figcaption>
+    <figcaption>가시광은 BS를 투과해 카메라로, ToF의 940nm는 BS에서 반사되어 시료로 갔다가 같은 경로로 돌아온다. BS 시료측 공통 경로에 4x 줌 렌즈를 두어 두 센서의 배율을 함께 올린다 — 결상형인지 무초점형인지에 따라 ToF에 미치는 영향이 달라지므로 그 위치는 3절 R2에서 판정한다. 두 스트림은 ESP32와 USB를 거쳐 PC에서 합쳐진다.</figcaption>
   </figure>
   <div class="callout">
     <span class="k">이 배치를 고른 이유</span>
